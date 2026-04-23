@@ -80,7 +80,7 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 	st.subheader("Global Parameters")
 	ctx.labor_rate_per_hour = float(
 		st.number_input(
-			"Labor rate per hour",
+			"Labor rate (€/hour)",
 			value=float(ctx.labor_rate_per_hour),
 			min_value=0.0,
 			step=0.5,
@@ -89,7 +89,7 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 	)
 	ctx.fixed_overhead = float(
 		st.number_input(
-			"Fixed overhead",
+			"Fixed overhead (€)",
 			value=float(ctx.fixed_overhead),
 			min_value=0.0,
 			step=100.0,
@@ -102,6 +102,10 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 		st.session_state["raw_materials_table"],
 		num_rows="dynamic",
 		use_container_width=True,
+		column_config={
+			"material": st.column_config.TextColumn("Material"),
+			"unit_cost": st.column_config.NumberColumn("Unit cost (€/unit)", format="%.4f"),
+		},
 		key="raw_materials_editor",
 	)
 	st.session_state["raw_materials_table"] = raw_edited
@@ -112,6 +116,14 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 		num_rows="dynamic",
 		disabled=["row_id"],
 		use_container_width=True,
+		column_config={
+			"row_id": st.column_config.NumberColumn("Row"),
+			"name": st.column_config.TextColumn("Product"),
+			"selling_price": st.column_config.NumberColumn("Selling price (€/unit)", format="%.2f"),
+			"target_ending_inv_pct": st.column_config.NumberColumn("Target ending inv (%)", format="%.2f"),
+			"labor_minutes": st.column_config.NumberColumn("Labor (min/unit)", format="%.2f"),
+			"opening_inv": st.column_config.NumberColumn("Opening inv (units)", format="%d"),
+		},
 		key="products_editor",
 	)
 	st.session_state["products_table"] = products_edited

@@ -67,7 +67,7 @@ def draw_waterfall_chart(variance_df: pd.DataFrame) -> go.Figure:
 	fig.update_layout(
 		title="Operating Income Waterfall",
 		showlegend=False,
-		yaxis_title="Amount",
+		yaxis_title="Amount (€)",
 		margin=dict(l=10, r=10, t=50, b=10),
 	)
 	return fig

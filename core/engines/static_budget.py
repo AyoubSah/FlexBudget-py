@@ -179,7 +179,7 @@ class StaticBudgetEngine:
 
 		return pd.DataFrame(
 			{
-				"Amount": [
+				"Amount (€)": [
 					revenue_total,
 					variable_costs,
 					contribution_margin,
@@ -193,5 +193,5 @@ class StaticBudgetEngine:
 				"Contribution Margin",
 				"Fixed Overhead",
 				"Operating Income",
-			],
+			],  
 		)

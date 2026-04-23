@@ -50,18 +50,54 @@ elif page == "2. Master Budget":
 	)
 
 	st.subheader("Revenue Budget")
-	st.dataframe(engine.revenue_budget(), use_container_width=True)
+	rev_df = engine.revenue_budget().rename(
+		columns={
+			"product": "Product",
+			"sales_units": "Sales Volume (Units)",
+			"selling_price": "Selling Price (€)",
+			"revenue": "Revenue (€)",
+		}
+	)
+	st.dataframe(rev_df, use_container_width=True)
 
 	st.subheader("Production Budget")
-	st.dataframe(engine.production_budget(), use_container_width=True)
+	prod_df = engine.production_budget().rename(
+		columns={
+			"product": "Product",
+			"sales_units": "Sales Volume (Units)",
+			"next_month_sales_units": "Next Month Sales (Units)",
+			"target_ending_inv_pct": "Target Ending Inv (%)",
+			"target_ending_inv_units": "Target Ending Inv (Units)",
+			"opening_inv": "Opening Inv (Units)",
+			"production_units": "Production (Units)",
+		}
+	)
+	st.dataframe(prod_df, use_container_width=True)
 
 	st.subheader("Direct Materials Budget")
-	st.dataframe(engine.direct_materials_budget(), use_container_width=True)
+	mat_df = engine.direct_materials_budget().rename(
+		columns={
+			"material": "Material",
+			"qty_required": "Qty Required (Units)",
+			"unit_cost": "Unit Cost (€/unit)",
+			"cost": "Cost (€)",
+		}
+	)
+	st.dataframe(mat_df, use_container_width=True)
 
 	st.subheader("Direct Labor Budget")
-	st.dataframe(engine.direct_labor_budget(), use_container_width=True)
+	labor_df = engine.direct_labor_budget().rename(
+		columns={
+			"product": "Product",
+			"production_units": "Production (Units)",
+			"labor_minutes": "Labor (Minutes/unit)",
+			"labor_hours": "Labor (Hours)",
+			"labor_cost": "Labor Cost (€)",
+		}
+	)
+	st.dataframe(labor_df, use_container_width=True)
 
-	st.subheader("Income Statement")
+	st.subheader("Income Statement (€)")
 	st.dataframe(engine.income_statement(), use_container_width=True)
 
 
@@ -144,7 +180,7 @@ elif page == "3. Variance Analysis":
 	st.subheader("Variance Report")
 	st.dataframe(variance_df, use_container_width=True)
 
-	st.subheader("Operating Income Waterfall")
+	st.subheader("Operating Income Waterfall (€)")
 	fig = draw_waterfall_chart(variance_df)
 	st.plotly_chart(fig, use_container_width=True)
 
@@ -181,10 +217,10 @@ elif page == "4. Risk Simulation":
 
 		st.subheader("Simulation Metrics")
 		c1, c2, c3, c4 = st.columns(4)
-		c1.metric("Expected Mean Profit", f"{metrics['expected_mean_profit']:,.0f}")
-		c2.metric("5th Percentile (Worst)", f"{metrics['p05_worst_case_profit']:,.0f}")
-		c3.metric("95th Percentile (Best)", f"{metrics['p95_best_case_profit']:,.0f}")
-		c4.metric("Probability Break-Even", f"{metrics['probability_of_break_even']:.1%}")
+		c1.metric("Expected Mean Profit (€)", f"€{metrics['expected_mean_profit']:,.2f}")
+		c2.metric("5th Percentile (Worst) (€)", f"€{metrics['p05_worst_case_profit']:,.2f}")
+		c3.metric("95th Percentile (Best) (€)", f"€{metrics['p95_best_case_profit']:,.2f}")
+		c4.metric("Probability Break-Even (%)", f"{(metrics['probability_of_break_even'] * 100):.2f}%")
 
-		st.subheader("Profit Distribution")
+		st.subheader("Profit Distribution (€)")
 		draw_profit_distribution(profits, metrics)

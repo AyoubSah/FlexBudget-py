@@ -13,7 +13,7 @@
   },
   "global_parameters": {
     "fixed_overhead": 150000.0,
-    "labor_rate_per_hour": 28.0
+    "labor_rate_per_hour": 29.0
   },
   "products": [
     {
