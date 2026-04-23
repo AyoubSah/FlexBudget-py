@@ -38,6 +38,14 @@
       "opening_inv": 1200,
       "selling_price": 1119.0,
       "target_ending_inv_pct": 0.15
+    },
+    {
+      "bill_of_materials": {},
+      "labor_minutes": 0.0,
+      "name": "None",
+      "opening_inv": 0,
+      "selling_price": 0.0,
+      "target_ending_inv_pct": 0.0
     }
   ],
   "raw_materials": {
@@ -46,6 +54,9 @@
     },
     "Display_iPhone": {
       "unit_cost": 75.0
+    },
+    "None": {
+      "unit_cost": 0.0
     },
     "PCB_iPad": {
       "unit_cost": 13.5
