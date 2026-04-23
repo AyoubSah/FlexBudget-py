@@ -1,0 +1,60 @@
+{
+  "forecasted_sales_units": {
+    "Nov_2026": {
+      "iPad_Pro": 9200,
+      "iPhone": 48000
+    },
+    "Oct_2026": {
+      "iPad_Pro": 8000,
+      "iPhone": 42000
+    }
+  },
+  "global_parameters": {
+    "fixed_overhead": 150000.0,
+    "labor_rate_per_hour": 30.0
+  },
+  "products": [
+    {
+      "bill_of_materials": {
+        "Battery_Wh": 10.0,
+        "Display_iPhone": 1.0,
+        "PCB_iPhone": 1.0,
+        "Packaging_Std": 1.0
+      },
+      "labor_minutes": 18.0,
+      "name": "iPhone",
+      "opening_inv": 8400,
+      "selling_price": 1200.0,
+      "target_ending_inv_pct": 0.2
+    },
+    {
+      "bill_of_materials": {
+        "Battery_Wh": 20.0,
+        "PCB_iPad": 1.0,
+        "Packaging_Std": 1.0
+      },
+      "labor_minutes": 25.0,
+      "name": "iPad_Pro",
+      "opening_inv": 1200,
+      "selling_price": 1119.0,
+      "target_ending_inv_pct": 0.15
+    }
+  ],
+  "raw_materials": {
+    "Battery_Wh": {
+      "unit_cost": 1.2
+    },
+    "Display_iPhone": {
+      "unit_cost": 75.0
+    },
+    "PCB_iPad": {
+      "unit_cost": 13.5
+    },
+    "PCB_iPhone": {
+      "unit_cost": 13.5
+    },
+    "Packaging_Std": {
+      "unit_cost": 2.5
+    }
+  }
+}
