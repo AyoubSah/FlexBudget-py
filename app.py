@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+from pathlib import Path
+
 from core.engines.static_budget import StaticBudgetEngine
 from core.engines.stochastic_mc import MonteCarloSimulator
 from core.engines.variance_calc import VarianceEngine
@@ -22,6 +24,10 @@ page = st.sidebar.radio(
 		"4. Risk Simulation",
 	],
 )
+
+
+st.sidebar.subheader("Data Source")
+uploaded_file = st.sidebar.file_uploader("Upload Actuals CSV", type=["csv"])
 
 
 if page == "1. Parameters Setup":
@@ -74,7 +80,64 @@ elif page == "3. Variance Analysis":
 		next_month_forecasted_sales_units=fcst_nov,
 	)
 
-	actuals_df = pd.read_csv("data/actuals.csv")
+	required_cols = [
+		"Month",
+		"Product",
+		"Actual_Sales_Units",
+		"Actual_Production_Units",
+		"Actual_Material_Cost",
+		"Actual_Labor_Cost",
+		"Actual_Revenue",
+	]
+
+	default_actuals_path = Path("data/actuals.csv")
+	known_products = {p.name for p in ctx.products}
+
+	def _load_default_actuals() -> pd.DataFrame:
+		st.toast("Loading default actuals from data/actuals.csv", icon="ℹ️")
+		st.info("Using default actuals data. Upload your own CSV for custom analysis.")
+		st.sidebar.info("💡 Running with sample Apple Inc. data")
+		return pd.read_csv(default_actuals_path)
+
+	actuals_df: pd.DataFrame
+	if uploaded_file is None:
+		actuals_df = _load_default_actuals()
+	else:
+		try:
+			uploaded_bytes = uploaded_file.getvalue()
+			actuals_df = pd.read_csv(uploaded_file)
+		except Exception:
+			msg = "⚠️ Upload could not be read. Falling back to default actuals."
+			st.sidebar.error(msg)
+			st.error(msg)
+			st.toast("Upload failed — using default actuals", icon="❌")
+			actuals_df = _load_default_actuals()
+		else:
+			missing_cols = [c for c in required_cols if c not in actuals_df.columns]
+			if missing_cols:
+				msg = "⚠️ Invalid CSV Format. Falling back to default actuals."
+				st.sidebar.error(msg)
+				st.error(msg)
+				st.toast("Invalid CSV format — using default actuals", icon="❌")
+				actuals_df = _load_default_actuals()
+			else:
+				unknown_products = sorted(set(actuals_df["Product"].astype(str)) - known_products)
+				if unknown_products:
+					msg = (
+						"⚠️ Product mismatch. Falling back to default actuals. "
+						f"Unknown products: {unknown_products}"
+					)
+					st.sidebar.error(msg)
+					st.error(msg)
+					st.toast("Product mismatch — using default actuals", icon="❌")
+					actuals_df = _load_default_actuals()
+				else:
+					# Persist valid upload locally for future runs.
+					default_actuals_path.parent.mkdir(parents=True, exist_ok=True)
+					default_actuals_path.write_bytes(uploaded_bytes)
+					st.sidebar.success("✅ Using custom actuals data")
+					st.toast("Custom actuals saved to data/actuals.csv", icon="✅")
+
 	variance_engine = VarianceEngine(static_engine, actuals_df, month="Oct_2026")
 	variance_df = variance_engine.variance_report()
 
@@ -106,11 +169,13 @@ elif page == "4. Risk Simulation":
 	simulator = MonteCarloSimulator(ctx, baseline)
 
 	if run:
+		st.toast("Running Monte Carlo simulation…", icon="⏳")
 		out = simulator.run_simulation(
 			num_iterations=int(num_iterations),
 			volume_volatility=float(volume_volatility),
 			price_volatility=float(price_volatility),
 		)
+		st.toast("Simulation completed", icon="✅")
 		metrics = out["metrics"]
 		profits = out["profits"]
 
@@ -122,5 +187,4 @@ elif page == "4. Risk Simulation":
 		c4.metric("Probability Break-Even", f"{metrics['probability_of_break_even']:.1%}")
 
 		st.subheader("Profit Distribution")
-		fig = draw_profit_distribution(profits, metrics)
-		st.plotly_chart(fig, use_container_width=True)
+		draw_profit_distribution(profits, metrics)

@@ -208,15 +208,102 @@ class VarianceEngine:
 		flexible_s = self._flexible_budget_summary()
 		actuals_s = self._actuals_summary()
 
-		volume_var = flexible_s - static_s
-		spending_var = actuals_s - flexible_s
+		# Sales volume (units): static from forecast, flexible/actuals from actual sales
+		static_units = float(sum(self.static_engine.forecasted_sales_units.values()))
+		actuals_by_prod = self._actuals_by_product()
+		flex_units = float(actuals_by_prod["actual_sales_units"].sum())
+		actual_units = flex_units
 
-		return pd.DataFrame(
+		numeric_static = pd.Series(
 			{
-				"Static Budget": static_s,
-				"Volume Variance": volume_var,
-				"Flexible Budget": flexible_s,
-				"Spending Variance": spending_var,
-				"Actuals": actuals_s,
+				"Sales Volume (Units)": static_units,
+				"Revenue (€)": static_s["Revenue"],
+				"Direct Materials Cost (€)": static_s["Direct Materials"],
+				"Direct Labor Cost (€)": static_s["Direct Labor"],
+				"Variable Costs (€)": static_s["Variable Costs (Materials + Labor)"],
+				"Fixed Overhead (€)": static_s["Fixed Overhead"],
+				"Operating Income (€)": static_s["Operating Income"],
 			}
 		)
+
+		numeric_flexible = pd.Series(
+			{
+				"Sales Volume (Units)": flex_units,
+				"Revenue (€)": flexible_s["Revenue"],
+				"Direct Materials Cost (€)": flexible_s["Direct Materials"],
+				"Direct Labor Cost (€)": flexible_s["Direct Labor"],
+				"Variable Costs (€)": flexible_s["Variable Costs (Materials + Labor)"],
+				"Fixed Overhead (€)": flexible_s["Fixed Overhead"],
+				"Operating Income (€)": flexible_s["Operating Income"],
+			}
+		)
+
+		numeric_actuals = pd.Series(
+			{
+				"Sales Volume (Units)": actual_units,
+				"Revenue (€)": actuals_s["Revenue"],
+				"Direct Materials Cost (€)": actuals_s["Direct Materials"],
+				"Direct Labor Cost (€)": actuals_s["Direct Labor"],
+				"Variable Costs (€)": actuals_s["Variable Costs (Materials + Labor)"],
+				"Fixed Overhead (€)": actuals_s["Fixed Overhead"],
+				"Operating Income (€)": actuals_s["Operating Income"],
+			}
+		)
+
+		volume_var = numeric_flexible - numeric_static
+		spending_var = numeric_actuals - numeric_flexible
+
+		# Status labeling rules
+		revenue_like_rows = {"Revenue (€)", "Operating Income (€)"}
+		cost_rows = {
+			"Direct Materials Cost (€)",
+			"Direct Labor Cost (€)",
+			"Variable Costs (€)",
+			"Fixed Overhead (€)",
+		}
+
+		def _variance_status(line_item: str, variance_value: float, is_spending: bool) -> str:
+			# For the units row, statuses are not meaningful.
+			if line_item == "Sales Volume (Units)":
+				return ""
+			# Revenue-like: positive variance is favorable.
+			if line_item in revenue_like_rows:
+				return "Favorable (F)" if variance_value > 0 else "Unfavorable (U)"
+			# Costs: negative variance (lower cost) is favorable.
+			if line_item in cost_rows:
+				return "Favorable (F)" if variance_value < 0 else "Unfavorable (U)"
+			# Fallback: treat as revenue-like
+			return "Favorable (F)" if variance_value > 0 else "Unfavorable (U)"
+
+		volume_status = pd.Series(
+			{idx: _variance_status(idx, float(volume_var[idx]), is_spending=False) for idx in numeric_static.index}
+		)
+		spending_status = pd.Series(
+			{idx: _variance_status(idx, float(spending_var[idx]), is_spending=True) for idx in numeric_static.index}
+		)
+
+		out = pd.DataFrame(
+			{
+				"Static Budget (€)": numeric_static,
+				"Volume Variance (€)": volume_var,
+				"Volume Status": volume_status,
+				"Flexible Budget (€)": numeric_flexible,
+				"Spending Variance (€)": spending_var,
+				"Spending Status": spending_status,
+				"Actuals (€)": numeric_actuals,
+			}
+		)
+
+		# Ensure requested column order
+		out = out[
+			[
+				"Static Budget (€)",
+				"Volume Variance (€)",
+				"Volume Status",
+				"Flexible Budget (€)",
+				"Spending Variance (€)",
+				"Spending Status",
+				"Actuals (€)",
+			]
+		]
+		return out

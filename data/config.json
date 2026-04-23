@@ -1,71 +1,82 @@
 {
   "forecasted_sales_units": {
     "Nov_2026": {
-      "iPad_Pro": 9200,
+      "MacBook Pro": 6000,
+      "iPad Pro": 9200,
       "iPhone": 48000
     },
     "Oct_2026": {
-      "iPad_Pro": 8000,
+      "MacBook Pro": 5400,
+      "iPad Pro": 8000,
       "iPhone": 42000
     }
   },
   "global_parameters": {
     "fixed_overhead": 150000.0,
-    "labor_rate_per_hour": 30.0
+    "labor_rate_per_hour": 28.0
   },
   "products": [
     {
       "bill_of_materials": {
         "Battery_Wh": 10.0,
-        "Display_iPhone": 1.0,
-        "PCB_iPhone": 1.0,
-        "Packaging_Std": 1.0
+        "Display": 1.0,
+        "PCB": 1.0,
+        "Packaging": 1.0
       },
       "labor_minutes": 18.0,
       "name": "iPhone",
       "opening_inv": 8400,
-      "selling_price": 1200.0,
+      "selling_price": 1099.0,
       "target_ending_inv_pct": 0.2
     },
     {
       "bill_of_materials": {
         "Battery_Wh": 20.0,
-        "PCB_iPad": 1.0,
-        "Packaging_Std": 1.0
+        "Display": 1.0,
+        "PCB": 1.0,
+        "Packaging": 1.0
       },
       "labor_minutes": 25.0,
-      "name": "iPad_Pro",
+      "name": "iPad Pro",
       "opening_inv": 1200,
       "selling_price": 1119.0,
       "target_ending_inv_pct": 0.15
     },
     {
-      "bill_of_materials": {},
-      "labor_minutes": 0.0,
-      "name": "None",
-      "opening_inv": 0,
-      "selling_price": 0.0,
-      "target_ending_inv_pct": 0.0
+      "bill_of_materials": {
+        "Aluminum_Chassis": 1.0,
+        "Battery_Wh": 60.0,
+        "PCB": 1.0,
+        "Packaging": 1.0
+      },
+      "labor_minutes": 45.0,
+      "name": "MacBook Pro",
+      "opening_inv": 810,
+      "selling_price": 1849.0,
+      "target_ending_inv_pct": 0.15
     }
   ],
   "raw_materials": {
+    "Aluminum_Chassis": {
+      "unit_cost": 120.0
+    },
     "Battery_Wh": {
       "unit_cost": 1.2
     },
-    "Display_iPhone": {
+    "Display": {
       "unit_cost": 75.0
     },
-    "None": {
-      "unit_cost": 0.0
+    "PCB": {
+      "unit_cost": 12.5
     },
-    "PCB_iPad": {
-      "unit_cost": 13.5
-    },
-    "PCB_iPhone": {
-      "unit_cost": 13.5
-    },
-    "Packaging_Std": {
+    "Packaging": {
       "unit_cost": 2.5
+    },
+    "Sensor_Module": {
+      "unit_cost": 22.0
+    },
+    "Speaker_Unit": {
+      "unit_cost": 8.5
     }
   }
 }

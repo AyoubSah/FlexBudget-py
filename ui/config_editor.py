@@ -117,6 +117,7 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 	st.session_state["products_table"] = products_edited
 
 	if st.button("Save Changes", type="primary"):
+		st.toast("Saving configuration…", icon="⏳")
 		new_raw_materials: dict[str, dict[str, float]] = {}
 		for _, row in raw_edited.iterrows():
 			material = str(row.get("material", "")).strip()
@@ -155,11 +156,13 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 		ctx.products = new_products
 
 		ctx.save_to_json()
+		st.toast("Configuration saved", icon="✅")
 
 		# Refresh JSON snapshot in session_state for other app components
 		try:
 			st.session_state["config_data"] = _read_json(Path(config_path))
 		except json.JSONDecodeError as exc:
+			st.toast("Save failed: config JSON is invalid", icon="❌")
 			st.error(f"Config saved but now JSON is invalid in {config_path}: {exc}")
 			st.stop()
 		st.rerun()
