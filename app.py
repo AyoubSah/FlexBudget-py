@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from datetime import datetime
 from pathlib import Path
 
 from core.engines.static_budget import StaticBudgetEngine
@@ -11,18 +12,28 @@ from ui.config_editor import render_config_editor
 from ui.dashboards import draw_detailed_variance_bar_chart, draw_profit_distribution, draw_waterfall_chart
 
 
-def get_next_month(current_month: str, all_months: list[str]) -> str:
+def get_next_month(current_month: str, all_months: list[str]) -> str | None:
 	"""Return the next month in the provided sequence.
 
-	If current_month is the last element (or not found), return current_month (steady-state).
+	If current_month is the last element (or not found), return None.
 	"""
 	try:
 		idx = all_months.index(str(current_month))
 	except ValueError:
-		return str(current_month)
+		return None
 	if idx >= len(all_months) - 1:
-		return str(current_month)
+		return None
 	return str(all_months[idx + 1])
+
+
+def _parse_month_key(month_key: str) -> datetime | None:
+	"""Parse month keys like 'Oct_2026' into a datetime for sorting."""
+	for fmt in ("%b_%Y", "%B_%Y"):
+		try:
+			return datetime.strptime(str(month_key), fmt)
+		except ValueError:
+			continue
+	return None
 
 
 def _fmt_currency(value: object) -> str:
@@ -139,7 +150,14 @@ except Exception as e:
 	ctx = None
 	exc = e
 
-available_months = list(ctx.forecasted_sales_units.keys()) if ctx is not None else []
+if ctx is not None:
+	month_keys = list(ctx.forecasted_sales_units.keys())
+	available_months = sorted(
+		month_keys,
+		key=lambda k: (_parse_month_key(str(k)) is None, _parse_month_key(str(k)) or datetime.max, str(k)),
+	)
+else:
+	available_months = []
 selected_month: str | None = None
 next_month: str | None = None
 
@@ -147,7 +165,7 @@ st.sidebar.subheader("Month")
 if available_months:
 	selected_month = st.sidebar.selectbox("Selected Month", options=available_months)
 	next_month = get_next_month(selected_month, available_months)
-	st.sidebar.caption(f"Next month: {next_month}")
+	st.sidebar.caption(f"Next month: {next_month or '—'}")
 else:
 	if exc is not None:
 		st.sidebar.error(f"Failed to load config: {exc}")
@@ -162,13 +180,13 @@ elif page == "2. Master Budget":
 	if ctx is None:
 		st.error("Configuration could not be loaded. Fix it in Parameters Setup.")
 		st.stop()
-	if selected_month is None or next_month is None:
+	if selected_month is None:
 		st.error("No forecasted months found in config forecasted_sales_units")
 		st.stop()
 
 	try:
 		forecast_current = ctx.forecasted_sales_units[selected_month]
-		forecast_next = ctx.forecasted_sales_units.get(next_month, forecast_current)
+		forecast_next = None if next_month is None else ctx.forecasted_sales_units.get(next_month, forecast_current)
 	except Exception:
 		st.error(f"Missing '{selected_month}' in config forecasted_sales_units")
 		st.stop()
@@ -201,6 +219,11 @@ elif page == "2. Master Budget":
 			unit_cols=["Sales Volume (Units)"],
 		)
 
+		if next_month is None:
+			st.warning(
+				"⚠️ Note: This is the final month in the forecast sequence. Target Ending Inventory is calculated as 0 units "
+				"because January 2027 data is not yet available in the parameters setup."
+			)
 		st.subheader("Production Budget")
 		prod_df = engine.production_budget().rename(
 			columns={
@@ -266,13 +289,13 @@ elif page == "3. Variance Analysis":
 	if ctx is None:
 		st.error("Configuration could not be loaded. Fix it in Parameters Setup.")
 		st.stop()
-	if selected_month is None or next_month is None:
+	if selected_month is None:
 		st.error("No forecasted months found in config forecasted_sales_units")
 		st.stop()
 
 	try:
 		forecast_current = ctx.forecasted_sales_units[selected_month]
-		forecast_next = ctx.forecasted_sales_units.get(next_month, forecast_current)
+		forecast_next = None if next_month is None else ctx.forecasted_sales_units.get(next_month, forecast_current)
 	except Exception:
 		st.error(f"Missing '{selected_month}' in config forecasted_sales_units")
 		st.stop()
@@ -431,9 +454,14 @@ elif page == "4. Risk Simulation":
 		st.subheader("Simulation Metrics")
 		c1, c2, c3, c4 = st.columns(4)
 		c1.metric("Expected Mean Profit (€)", _fmt_currency(metrics["expected_mean_profit"]))
-		c2.metric("5th Percentile (Worst) (€)", _fmt_currency(metrics["p05_worst_case_profit"]))
+		c2.metric("Profit at Risk (VaR 95%)", _fmt_currency(metrics["p05_worst_case_profit"]))
 		c3.metric("95th Percentile (Best) (€)", _fmt_currency(metrics["p95_best_case_profit"]))
 		c4.metric("Probability Break-Even (%)", f"{(metrics['probability_of_break_even'] * 100):.2f}%")
+
+		st.info(
+			"💡 Managerial Insight: The Profit at Risk (VaR 95%) indicates that there is a 95% statistical confidence "
+			"that the operating income will not fall below this value under the current volatility assumptions."
+		)
 
 		st.subheader("Profit Distribution (€)")
 		draw_profit_distribution(profits, metrics)

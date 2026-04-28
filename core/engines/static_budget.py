@@ -30,6 +30,8 @@ class StaticBudgetEngine:
 
 	def _sales_df(self, sales_units: dict[str, float] | None) -> pd.DataFrame:
 		sales_units = sales_units or {}
+		if not sales_units:
+			return pd.DataFrame(columns=["product", "sales_units"])
 		return pd.DataFrame(
 			[{"product": str(name), "sales_units": float(units)} for name, units in sales_units.items()]
 		)
