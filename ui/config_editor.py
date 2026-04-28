@@ -29,10 +29,12 @@ def _init_session_state(config_path: str) -> None:
 			"company_ctx",
 			"raw_materials_table",
 			"products_table",
+			"forecast_table",
 			"labor_rate_per_hour_input",
 			"fixed_overhead_input",
 			"raw_materials_editor",
 			"products_editor",
+			"forecast_editor",
 		):
 			st.session_state.pop(key, None)
 		st.session_state["_config_path"] = str(path)
@@ -70,6 +72,20 @@ def _init_session_state(config_path: str) -> None:
 				}
 			)
 		st.session_state["products_table"] = pd.DataFrame(rows)
+
+	if "forecast_table" not in st.session_state:
+		ctx: CompanyContext = st.session_state["company_ctx"]
+		product_names = [p.name for p in ctx.products]
+		forecast = ctx.forecasted_sales_units or {}
+		rows: list[dict[str, Any]] = []
+		for month, product_map in forecast.items():
+			row: dict[str, Any] = {"Month": str(month)}
+			for name in product_names:
+				row[name] = float((product_map or {}).get(name, 0) or 0)
+			rows.append(row)
+
+		# If there are no months yet, initialize an empty editable table.
+		st.session_state["forecast_table"] = pd.DataFrame(rows, columns=["Month", *product_names])
 
 
 def render_company_config_editor(config_path: str = "data/config.json") -> None:
@@ -128,6 +144,43 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 	)
 	st.session_state["products_table"] = products_edited
 
+	# Ensure the forecasts table has a column for every product name (including newly added ones).
+	product_names_current = [
+		str(name).strip()
+		for name in products_edited.get("name", pd.Series([], dtype=object)).astype(str).tolist()
+		if str(name).strip()
+	]
+	forecast_table: pd.DataFrame = st.session_state.get("forecast_table", pd.DataFrame()).copy()
+	if forecast_table.empty:
+		forecast_table = pd.DataFrame(columns=["Month", *product_names_current])
+	if "Month" not in forecast_table.columns:
+		forecast_table.insert(0, "Month", "")
+	for p_name in product_names_current:
+		if p_name not in forecast_table.columns:
+			forecast_table[p_name] = 0.0
+	st.session_state["forecast_table"] = forecast_table
+
+	st.subheader("Sales Forecasts")
+	forecast_columns = ["Month", *product_names_current]
+	# Keep any existing extra columns at the end (e.g., from prior product names) to avoid data loss.
+	extra_cols = [c for c in st.session_state["forecast_table"].columns if c not in forecast_columns]
+	forecast_view = st.session_state["forecast_table"][forecast_columns + extra_cols].copy()
+
+	forecast_edited = st.data_editor(
+		forecast_view,
+		num_rows="dynamic",
+		use_container_width=True,
+		column_config={
+			"Month": st.column_config.TextColumn("Month"),
+			**{
+				name: st.column_config.NumberColumn(f"{name} (units)", min_value=0.0, step=100.0, format="%d")
+				for name in product_names_current
+			},
+		},
+		key="forecast_editor",
+	)
+	st.session_state["forecast_table"] = forecast_edited
+
 	if st.button("Save Changes", type="primary"):
 		st.toast("Saving configuration…", icon="⏳")
 		new_raw_materials: dict[str, dict[str, float]] = {}
@@ -166,6 +219,28 @@ def render_company_config_editor(config_path: str = "data/config.json") -> None:
 				)
 			)
 		ctx.products = new_products
+
+		# Parse forecasts table back into nested dict: {month: {product: units}}
+		forecast_df: pd.DataFrame = st.session_state.get("forecast_table", pd.DataFrame()).copy()
+		if not forecast_df.empty and "Month" in forecast_df.columns:
+			forecasted_sales_units: dict[str, dict[str, int]] = {}
+			for _, row in forecast_df.iterrows():
+				month = str(row.get("Month", "")).strip()
+				if not month or month.lower() == "nan":
+					continue
+
+				month_map: dict[str, int] = {}
+				for p_name in [p.name for p in new_products]:
+					val = row.get(p_name, 0)
+					try:
+						n = int(float(val)) if val is not None and str(val).strip() != "" else 0
+					except Exception:
+						n = 0
+					month_map[p_name] = max(0, n)
+
+				forecasted_sales_units[month] = month_map
+
+			ctx.forecasted_sales_units = forecasted_sales_units
 
 		ctx.save_to_json()
 		st.toast("Configuration saved", icon="✅")

@@ -1,5 +1,10 @@
 {
   "forecasted_sales_units": {
+    "Dec_2026": {
+      "MacBook Pro": 7200,
+      "iPad Pro": 10500,
+      "iPhone": 60000
+    },
     "Nov_2026": {
       "MacBook Pro": 6000,
       "iPad Pro": 9200,
@@ -13,7 +18,7 @@
   },
   "global_parameters": {
     "fixed_overhead": 150000.0,
-    "labor_rate_per_hour": 29.0
+    "labor_rate_per_hour": 28.0
   },
   "products": [
     {
@@ -39,7 +44,7 @@
       "labor_minutes": 25.0,
       "name": "iPad Pro",
       "opening_inv": 1200,
-      "selling_price": 1119.0,
+      "selling_price": 1399.0,
       "target_ending_inv_pct": 0.15
     },
     {
@@ -52,7 +57,7 @@
       "labor_minutes": 45.0,
       "name": "MacBook Pro",
       "opening_inv": 810,
-      "selling_price": 1849.0,
+      "selling_price": 1699.0,
       "target_ending_inv_pct": 0.15
     }
   ],
@@ -71,12 +76,6 @@
     },
     "Packaging": {
       "unit_cost": 2.5
-    },
-    "Sensor_Module": {
-      "unit_cost": 22.0
-    },
-    "Speaker_Unit": {
-      "unit_cost": 8.5
     }
   }
 }

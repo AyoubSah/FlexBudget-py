@@ -253,6 +253,17 @@ class VarianceEngine:
 		volume_var = numeric_flexible - numeric_static
 		spending_var = numeric_actuals - numeric_flexible
 
+		# Percent variances: variance vs static baseline.
+		# For rows where static is 0 (or not meaningful), leave as NA.
+		static_den = numeric_static.copy()
+		static_den = static_den.where(static_den != 0, pd.NA)
+		volume_var_pct = volume_var / static_den
+		spending_var_pct = spending_var / static_den
+		# Units row percent is not meaningful.
+		for pct_s in (volume_var_pct, spending_var_pct):
+			if "Sales Volume (Units)" in pct_s.index:
+				pct_s.loc["Sales Volume (Units)"] = pd.NA
+
 		# Status labeling rules
 		revenue_like_rows = {"Revenue (€)", "Operating Income (€)"}
 		cost_rows = {
@@ -263,17 +274,25 @@ class VarianceEngine:
 		}
 
 		def _variance_status(line_item: str, variance_value: float, is_spending: bool) -> str:
+			eps = 0.01
+			# Treat tiny variances as zero to avoid floating point noise.
+			if abs(float(variance_value)) <= eps:
+				return ""
+			# Fixed overhead has no volume variance (it is fixed with respect to activity).
+			if (not is_spending) and line_item == "Fixed Overhead (€)":
+				return ""
+
 			# For the units row, statuses are not meaningful.
 			if line_item == "Sales Volume (Units)":
 				return ""
 			# Revenue-like: positive variance is favorable.
 			if line_item in revenue_like_rows:
-				return "Favorable (F)" if variance_value > 0 else "Unfavorable (U)"
+				return "Favorable (F)" if variance_value > eps else "Unfavorable (U)"
 			# Costs: negative variance (lower cost) is favorable.
 			if line_item in cost_rows:
-				return "Favorable (F)" if variance_value < 0 else "Unfavorable (U)"
+				return "Favorable (F)" if variance_value < -eps else "Unfavorable (U)"
 			# Fallback: treat as revenue-like
-			return "Favorable (F)" if variance_value > 0 else "Unfavorable (U)"
+			return "Favorable (F)" if variance_value > eps else "Unfavorable (U)"
 
 		volume_status = pd.Series(
 			{idx: _variance_status(idx, float(volume_var[idx]), is_spending=False) for idx in numeric_static.index}
@@ -286,9 +305,11 @@ class VarianceEngine:
 			{
 				"Static Budget (€)": numeric_static,
 				"Volume Variance (€)": volume_var,
+				"Volume Var %": volume_var_pct,
 				"Volume Status": volume_status,
 				"Flexible Budget (€)": numeric_flexible,
 				"Spending Variance (€)": spending_var,
+				"Spending Var %": spending_var_pct,
 				"Spending Status": spending_status,
 				"Actuals (€)": numeric_actuals,
 			}
@@ -299,11 +320,16 @@ class VarianceEngine:
 			[
 				"Static Budget (€)",
 				"Volume Variance (€)",
+				"Volume Var %",
 				"Volume Status",
 				"Flexible Budget (€)",
 				"Spending Variance (€)",
+				"Spending Var %",
 				"Spending Status",
 				"Actuals (€)",
 			]
 		]
+
+		# Clean index labels (avoid stray whitespace / inconsistent naming).
+		out.index = out.index.map(lambda x: str(x).strip())
 		return out

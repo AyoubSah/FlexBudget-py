@@ -67,6 +67,15 @@ class StaticBudgetEngine:
 
 	def production_budget(self) -> pd.DataFrame:
 		"""Production Budget: qp = qs + (q_next * target_pct) - opening_inv."""
+		out = self._production_budget_raw()
+
+		# Integrity: production cannot be negative. If opening inventory exceeds needs,
+		# cap production at zero (steady-state behavior).
+		out["production_units"] = out["production_units"].clip(lower=0.0)
+		return out
+
+	def _production_budget_raw(self) -> pd.DataFrame:
+		"""Internal production budget without clamping negative production."""
 		self._validate_products()
 
 		products = self._products_df()
@@ -93,6 +102,11 @@ class StaticBudgetEngine:
 			]
 		].copy()
 		return out
+
+	def validate_logic(self) -> bool:
+		"""Return True if production would be negative (before clamping)."""
+		raw = self._production_budget_raw()
+		return bool((raw["production_units"] < 0).any())
 
 	def direct_materials_budget(self) -> pd.DataFrame:
 		"""Direct Materials Budget grouped by material."""
@@ -172,7 +186,9 @@ class StaticBudgetEngine:
 		materials_total = float(materials_df.loc[materials_df["material"] == "TOTAL", "cost"].iloc[0])
 		labor_total = float(labor_df.loc[labor_df["product"] == "TOTAL", "labor_cost"].iloc[0])
 
-		variable_costs = materials_total + labor_total
+		material_cost_total = materials_total
+		labor_cost_total = labor_total
+		variable_costs = material_cost_total + labor_cost_total
 		contribution_margin = revenue_total - variable_costs
 		fixed_overhead = float(self.company.fixed_overhead)
 		operating_income = contribution_margin - fixed_overhead
@@ -181,6 +197,8 @@ class StaticBudgetEngine:
 			{
 				"Amount (€)": [
 					revenue_total,
+					material_cost_total,
+					labor_cost_total,
 					variable_costs,
 					contribution_margin,
 					fixed_overhead,
@@ -189,7 +207,9 @@ class StaticBudgetEngine:
 			},
 			index=[
 				"Revenue",
-				"Variable Costs (Materials + Labor)",
+				"Total Material Cost",
+				"Total Labor Cost",
+				"Variable Costs",
 				"Contribution Margin",
 				"Fixed Overhead",
 				"Operating Income",

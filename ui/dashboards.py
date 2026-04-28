@@ -34,8 +34,13 @@ def _extract_operating_income_row(variance_df: pd.DataFrame) -> pd.Series:
 	raise KeyError("Could not find Operating Income row in variance_df")
 
 
-def draw_waterfall_chart(variance_df: pd.DataFrame) -> go.Figure:
-	"""Plot Operating Income bridge: Static -> Volume -> Spending -> Actuals."""
+def draw_waterfall_chart(variance_df: pd.DataFrame, *, differences_only: bool = False) -> go.Figure:
+	"""Plot Operating Income waterfall.
+
+	Modes:
+	- Absolute (default): Static -> Volume -> Spending -> Actuals.
+	- Differences only: start at 0 and show only variances summing to Net Change.
+	"""
 
 	op = _extract_operating_income_row(variance_df)
 
@@ -49,14 +54,28 @@ def draw_waterfall_chart(variance_df: pd.DataFrame) -> go.Figure:
 	volume_var = float(op[volume_col])
 	spending_var = float(op[spending_col])
 	actual_val = float(op[actuals_col])
+	net_change = volume_var + spending_var
+
+	if differences_only:
+		measure = ["relative", "relative", "total"]
+		x = ["Volume Variance", "Spending Variance", "Net Change"]
+		y = [volume_var, spending_var, net_change]
+		yaxis_title = "Amount (€)"
+		title = "Operating Income Variances (Differences Only)"
+	else:
+		measure = ["absolute", "relative", "relative", "total"]
+		x = ["Static Budget", "Volume Variance", "Spending Variance", "Actuals"]
+		y = [static_val, volume_var, spending_var, actual_val]
+		yaxis_title = "Amount (€)"
+		title = "Operating Income Waterfall"
 
 	fig = go.Figure(
 		go.Waterfall(
 			name="Operating Income",
 			orientation="v",
-			measure=["absolute", "relative", "relative", "total"],
-			x=["Static Budget", "Volume Variance", "Spending Variance", "Actuals"],
-			y=[static_val, volume_var, spending_var, actual_val],
+			measure=measure,
+			x=x,
+			y=y,
 			increasing={"marker": {"color": "#2ECC71"}},  # Emerald Green
 			decreasing={"marker": {"color": "#E74C3C"}},  # Alizarin Red
 			totals={"marker": {"color": "#3498DB"}},  # Belize Blue
@@ -65,9 +84,9 @@ def draw_waterfall_chart(variance_df: pd.DataFrame) -> go.Figure:
 	)
 
 	fig.update_layout(
-		title="Operating Income Waterfall",
+		title=title,
 		showlegend=False,
-		yaxis_title="Amount (€)",
+		yaxis_title=yaxis_title,
 		margin=dict(l=10, r=10, t=50, b=10),
 	)
 	return fig
@@ -133,5 +152,124 @@ def draw_profit_distribution(profit_array: np.ndarray, metrics_dict: dict[str, A
 		fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
 		st.plotly_chart(fig, use_container_width=True)
 
+	return fig
+
+
+def draw_variance_analysis_bars(variance_df: pd.DataFrame) -> go.Figure:
+	"""Grouped horizontal bars for volume vs spending variances.
+
+	Excludes Sales Volume and any TOTAL rows to keep the scale focused on errors.
+	"""
+
+	volume_col = "Volume Variance (€)" if "Volume Variance (€)" in variance_df.columns else "Volume Variance"
+	spending_col = (
+		"Spending Variance (€)" if "Spending Variance (€)" in variance_df.columns else "Spending Variance"
+	)
+
+	missing = [c for c in (volume_col, spending_col) if c not in variance_df.columns]
+	if missing:
+		raise KeyError(f"variance_df missing required columns: {missing}")
+
+	# Get line items from index (preferred) or fallback to a column.
+	if variance_df.index is not None and variance_df.index.nlevels == 1:
+		line_items = variance_df.index.to_series().astype(str).str.strip()
+		base = variance_df.copy()
+		base = base.assign(**{"Line Item": line_items.values})
+	else:
+		base = variance_df.copy()
+		if "Line Item" not in base.columns:
+			raise KeyError("variance_df must have a labeled index or a 'Line It" \
+			"em' column")
+
+	li = base["Line Item"].astype(str).str.strip()
+	mask_sales_volume = li.str.contains("Sales Volume", case=False, na=False)
+	mask_total = li.str.fullmatch("TOTAL", case=False, na=False) | li.str.contains("\bTOTAL\b", case=False, na=False)
+
+	plot_df = base.loc[~(mask_sales_volume | mask_total), ["Line Item", volume_col, spending_col]].copy()
+
+	# Long format for grouped bars.
+	long_df = plot_df.melt(
+		id_vars=["Line Item"],
+		value_vars=[volume_col, spending_col],
+		var_name="Variance Type",
+		value_name="Variance (€)",
+	)
+
+	fig = px.bar(
+		long_df,
+		y="Line Item",
+		x="Variance (€)",
+		color="Variance Type",
+		barmode="group",
+		orientation="h",
+		title="Variance Analysis (Volume vs Spending)",
+	)
+	fig.update_layout(
+		xaxis_title="Variance (€)",
+		yaxis_title="",
+		margin=dict(l=10, r=10, t=50, b=10),
+		legend_title_text="",
+	)
+	return fig
+
+
+def draw_detailed_variance_bar_chart(variance_df: pd.DataFrame) -> go.Figure:
+	"""Detailed grouped variance bars (Volume vs Spending).
+
+	Filters out 'Sales Volume (Units)' and 'Operating Income (€)' rows to focus on
+	category-level variances only.
+	"""
+
+	# Choose variance columns (support both old and new naming).
+	volume_col = "Volume Variance (€)" if "Volume Variance (€)" in variance_df.columns else "Volume Variance"
+	spending_col = (
+		"Spending Variance (€)" if "Spending Variance (€)" in variance_df.columns else "Spending Variance"
+	)
+
+	missing = [c for c in (volume_col, spending_col) if c not in variance_df.columns]
+	if missing:
+		raise KeyError(f"variance_df missing required columns: {missing}")
+
+	df = variance_df.copy()
+	# Data cleaning: filter out specific summary rows.
+	idx = df.index.to_series().astype(str).str.strip()
+	df = df.loc[~idx.isin(["Sales Volume (Units)", "Operating Income (€)"])].copy()
+
+	# Data transformation: wide -> long using reset_index().melt().
+	df.index.name = "Line Item"
+	long_df = (
+		df.reset_index()
+		.melt(
+			id_vars=["Line Item"],
+			value_vars=[volume_col, spending_col],
+			var_name="variable",
+			value_name="value",
+		)
+		.dropna(subset=["value"])
+	)
+
+	fig = px.bar(
+		long_df,
+		y="Line Item",
+		x="value",
+		color="variable",
+		barmode="group",
+		orientation="h",
+		template="plotly_white",
+		color_discrete_map={
+			volume_col: "#3498DB",  # Volume
+			spending_col: "#9B59B6",  # Spending
+		},
+		title="Detailed Variance Analysis (Volume vs Spending)",
+	)
+
+	fig.add_vline(x=0, line_width=1, line_color="rgba(0,0,0,0.4)")
+	fig.update_layout(
+		xaxis_title="Variance (€)",
+		yaxis_title="",
+		legend_title_text="",
+		legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+		margin=dict(l=10, r=10, t=50, b=10),
+	)
 	return fig
 
